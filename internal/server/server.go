@@ -32,20 +32,16 @@ func (s *Server) ServeWs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println("new connection", conn.RemoteAddr().String())
-	// todo: put join message into queue
 
 	c := clients.NewClient(conn)
 
 	s.clients[c] = true
 
 	go s.receiveMessages(c)
-	// sendMessages(conn)
 }
 
 // receive messages from conn and broadcast to all others
 func (s *Server) receiveMessages(c *clients.Client) {
-	addr := c.Conn.RemoteAddr().String()
-	addr = addr[len(addr)-5:]
 	for {
 		_, bytes, err := c.Conn.ReadMessage()
 		if err != nil {
@@ -59,6 +55,7 @@ func (s *Server) receiveMessages(c *clients.Client) {
 		s.broadcast(msg, c)
 	}
 
+	// client left
 	delete(s.clients, c)
 	c.Conn.Close()
 }
@@ -66,6 +63,7 @@ func (s *Server) receiveMessages(c *clients.Client) {
 // send message to all connected clients except message sender
 func (s *Server) broadcast(msg string, source *clients.Client) {
 	for c := range s.clients {
+		// do not broadcast a message to the sender
 		if c == source {
 			continue
 		}

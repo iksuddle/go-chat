@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	"github.com/iksuddle/go-chat/internal/messages"
 )
 
 var reader = bufio.NewReader(os.Stdin)
@@ -35,6 +34,7 @@ func (c *Client) Start() {
 	c.sendMessages()
 }
 
+// get messages from stdin and send them to the server
 func (c *Client) sendMessages() {
 	for {
 		msg, err := getMessage()
@@ -51,6 +51,7 @@ func (c *Client) sendMessages() {
 	}
 }
 
+// print messages sent from server
 func (c *Client) receiveMessages() {
 	for {
 		_, bytes, err := c.Conn.ReadMessage()
@@ -64,6 +65,8 @@ func (c *Client) receiveMessages() {
 
 	c.Conn.Close()
 }
+
+// get message from stdin
 func getMessage() (string, error) {
 	fmt.Print("> ")
 	msg, err := reader.ReadString('\n')

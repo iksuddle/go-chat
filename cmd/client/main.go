@@ -11,8 +11,9 @@ import (
 func main() {
 	u := url.URL{
 		Scheme: "ws",
-		Host:   "localhost:8080",
-		Path:   "/ws",
+		// Host:   "192.168.100.46:8080",
+		Host: "localhost:8080",
+		Path: "/ws",
 	}
 
 	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
