@@ -8,10 +8,12 @@ import (
 )
 
 func main() {
-	s := server.NewServer()
+	mux := http.NewServeMux()
 
-	http.HandleFunc("/ws", s.ServeWs)
+	s := server.NewServer(mux)
+
+	mux.HandleFunc("/create", s.CreateRoom)
 
 	log.Println("starting server on port 8080")
-	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
+	log.Fatal(http.ListenAndServe("0.0.0.0:8080", mux))
 }

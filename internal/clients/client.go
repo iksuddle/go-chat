@@ -17,15 +17,17 @@ type Client struct {
 	Name string
 	// the server
 	Conn *websocket.Conn
+	Room string
 }
 
-func NewClient(conn *websocket.Conn) *Client {
+func NewClient(conn *websocket.Conn, room string) *Client {
 	addr := conn.RemoteAddr().String()
 	addr = addr[len(addr)-5:]
 
 	return &Client{
 		Name: addr,
 		Conn: conn,
+		Room: room,
 	}
 }
 

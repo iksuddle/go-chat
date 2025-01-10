@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"unicode"
 
 	"github.com/gorilla/websocket"
 	"github.com/iksuddle/go-chat/internal/clients"
@@ -11,15 +13,52 @@ import (
 )
 
 type Server struct {
-	clients  map[*clients.Client]bool
+	Mux      *http.ServeMux
 	upgrader *websocket.Upgrader
+	rooms    map[string]*room
 }
 
-func NewServer() *Server {
+func NewServer(mux *http.ServeMux) *Server {
 	return &Server{
-		clients:  make(map[*clients.Client]bool),
+		Mux:      mux,
 		upgrader: &websocket.Upgrader{},
+		rooms:    make(map[string]*room),
 	}
+}
+
+// create a new room
+func (s *Server) CreateRoom(w http.ResponseWriter, r *http.Request) {
+	roomName := r.FormValue("roomName")
+
+	if roomName == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("room name must be alphabetical"))
+		return
+	}
+
+	if !isAlpha(roomName) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("room name must be alphabetical"))
+		return
+	}
+
+	_, exists := s.rooms[roomName]
+	if exists {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("room name must be alphabetical"))
+		return
+	}
+
+	s.rooms[roomName] = &room{
+		clients: make(map[*clients.Client]struct{}),
+	}
+	s.Mux.HandleFunc(fmt.Sprintf("/%s", roomName), func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(context.WithValue(r.Context(), "roomName", roomName))
+		s.ServeWs(w, r)
+	})
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("room %s created", roomName)))
 }
 
 func (s *Server) ServeWs(w http.ResponseWriter, r *http.Request) {
@@ -33,9 +72,10 @@ func (s *Server) ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("new connection", conn.RemoteAddr().String())
 
-	c := clients.NewClient(conn)
+	roomName := r.Context().Value("roomName").(string)
+	c := clients.NewClient(conn, roomName)
 
-	s.clients[c] = true
+	s.rooms[roomName].addClient(c)
 
 	go s.receiveMessages(c)
 }
@@ -56,22 +96,20 @@ func (s *Server) receiveMessages(c *clients.Client) {
 	}
 
 	// client left
-	delete(s.clients, c)
+	s.rooms[c.Room].removeClient(c)
 	c.Conn.Close()
 }
 
 // send message to all connected clients except message sender
 func (s *Server) broadcast(msg string, source *clients.Client) {
-	for c := range s.clients {
-		// do not broadcast a message to the sender
-		if c == source {
-			continue
-		}
+	s.rooms[source.Room].broadcast(msg, source)
+}
 
-		err := c.Conn.WriteMessage(websocket.TextMessage, []byte(msg))
-		if err != nil {
-			log.Println(err)
-			continue
+func isAlpha(s string) bool {
+	for _, r := range s {
+		if !unicode.IsLetter(r) {
+			return false
 		}
 	}
+	return true
 }
